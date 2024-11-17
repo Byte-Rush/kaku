@@ -1,7 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:kaku/utils/extension/int_sized.dart';
 import 'package:kaku/utils/extension/string.dart';
-
 import '../storage/db_helper.dart';
 
 class Home extends StatefulWidget {
@@ -101,7 +101,7 @@ class _HomeState extends State<Home> {
   }) {
     final inCart = cartItems.contains(id);
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -116,26 +116,93 @@ class _HomeState extends State<Home> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          10.height,
-          name.boldText(),
-          8.height,
-          '\$$price'.text(color: Colors.green),
-          Spacer(),
-          ElevatedButton(
-            onPressed: () => _toggleCart(id),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: inCart ? Colors.red : Colors.purple,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+          Expanded(
+            flex: 3,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: _buildProductImage(image),
             ),
-            child: (inCart ? 'Remove from Cart' : 'Add to Cart').text(
-              color: Colors.white,
+          ),
+          8.height,
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                name.boldText(fontSize: 14),
+                4.height,
+                '\$$price'.text(color: Colors.green, fontSize: 16),
+                4.height,
+                ElevatedButton(
+                  onPressed: () => _toggleCart(id),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: inCart ? Colors.red : Colors.purple,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    minimumSize: Size(double.infinity, 32),
+                  ),
+                  child: (inCart ? 'Remove' : 'Add to Cart').text(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildProductImage(String imagePath) {
+    if (imagePath.startsWith('http')) {
+      // For network images
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholder();
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(child: CircularProgressIndicator());
+        },
+      );
+    } else {
+      // For local database images
+      return FutureBuilder<bool>(
+        future: _checkImageExists(imagePath),
+        builder: (context, snapshot) {
+          if (snapshot.hasData && snapshot.data == true) {
+            return Image.file(
+              File(imagePath),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return _buildPlaceholder();
+              },
+            );
+          } else {
+            return _buildPlaceholder();
+          }
+        },
+      );
+    }
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      color: Colors.grey[200],
+      child: Icon(
+        Icons.image_not_supported,
+        color: Colors.grey[400],
+        size: 40,
+      ),
+    );
+  }
+
+  Future<bool> _checkImageExists(String path) async {
+    return await File(path).exists();
   }
 
   void _showCart() {
@@ -156,12 +223,19 @@ class _HomeState extends State<Home> {
                   itemBuilder: (context, index) {
                     final product = cartProducts[index];
                     return ListTile(
-                      leading: Image.asset(product['image'], width: 50, height: 50),
+                      leading: SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: _buildProductImage(product['image']),
+                      ),
                       title: product['name'].boldText(),
                       subtitle: '\$${product['price']}'.text(color: Colors.green),
                       trailing: IconButton(
                         icon: Icon(Icons.remove_circle, color: Colors.red),
-                        onPressed: () => _toggleCart(product['id']),
+                        onPressed: () {
+                          _toggleCart(product['id']);
+                          Navigator.pop(context);
+                        },
                       ),
                     );
                   },
